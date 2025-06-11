@@ -1,0 +1,308 @@
+function setupGame() {
+  const jsPsych = initJsPsych({
+        default_iti: 1000,
+        show_progress_bar: true
+    });    
+
+  // get experiment ID information from URL
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+  const prolificID = urlParams.get('PROLIFIC_PID')   // ID unique to the participant
+  const studyID = urlParams.get('STUDY_ID')          // ID unique to the study
+  const sessionID = urlParams.get('SESSION_ID')      // ID unique to the particular submission
+  
+  const main_on_finish = function(data) {
+    console.log('emitting trial data', data)
+  }
+
+  const additionalInfo = {
+    prolificID: prolificID,
+    studyID: studyID,
+    sessionID: sessionID,  // this is the same as gameID
+    on_finish: main_on_finish
+  }  
+
+  const choices = [
+    'Airplane', 
+    'Bicycle', 
+    'Bird', 
+    'Car', 
+    'Cat', 
+    'Chair', 
+    'Cup', 
+    'Hat', 
+    'House', 
+    'Rabbit', 
+    'Tree', 
+    'Watch'
+  ];
+
+  // change this if running with new drawings
+  const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
+
+  // select random subset of stimuli
+  let randomSubset = [];
+  choices.forEach((category => {
+    for (i = 0; i < ageGroupIds.length; i++) {
+      const range = ageGroupIds[i];
+      const ageGroup = stimuli.filter((stim) => {
+        return (
+          (Number(stim.participant_id) >= range[0] && Number(stim.participant_id) <= range[1]) &&
+          (stim.english === category)
+        );
+      });
+      
+      randomSubset.push(ageGroup[Math.floor(Math.random() * ageGroup.length)]);
+    }
+  }));
+  randomSubset = _.shuffle(randomSubset);
+  
+  // Create raw trials list
+  let rawTrials = [];
+  function createTrialsList(callback) {      
+    randomSubset.forEach((stim) => {
+      const trial = {
+        type: jsPsychImageButtonResponse,
+        prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
+        choices: choices,
+        button_html: () => {
+          return (_.map(choices, (choice) => {
+            return `<button class="jspsych-btn">${choice}</button>`
+          }));
+        },
+        stimulus: `https://kisumu-drawings.s3-us-west-1.amazonaws.com/${stim.file}`,
+        post_trial_gap: 500,
+        data: {
+          sketcher_category: stim.english,
+          sketch_id: stim.file, 
+          catch_trial: false, 
+          prep_trial: false,
+        },
+        on_finish: (data) => {
+          jsPsych.data.addDataToLastTrial({
+            response_category: choices[data.response], 
+            participant_id: prolificID,
+          });
+        },
+       };
+
+      rawTrials.push(trial);
+    }); 
+    console.log(rawTrials);
+
+    callback(rawTrials) // add catch trials
+  };
+
+  function createCatchTrials(callback) {
+    // manually create a catch trial metadata object
+    catch_paths = [{'category': 'airplane', 'path': 'stimuli/catch_trials/0_airplane_catch.jpg'}]
+                  
+    // make list of catch trials in same format as the other trials
+    catchtrials = _.map(catch_paths, function(n,i) {
+      return trial = {
+        type: jsPsychImageButtonResponse,
+        prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
+        choices: choices,
+        button_html: () => {
+          return (_.map(choices, (choice) => {
+            return `<button class="jspsych-btn">${choice}</button>`
+          }));
+        },
+        stimulus: n.path,
+        data: {
+          catch_trial: true,
+          prep_trial: false,
+          sketcher_category: n.category,
+        },
+        post_trial_gap: 500,
+        on_finish: (data) => {
+          jsPsych.data.addDataToLastTrial({
+            response_category: choices[data.response],
+            participant_id: prolificID,
+          });
+        },
+      };
+    });
+
+    prep_paths = [
+      {'category': 'cat', 'path': 'stimuli/prep_trials/0_cat_prep.jpg'},
+      {'category': 'car', 'path': 'stimuli/prep_trials/1_car_prep.png'},
+    ];
+
+    preptrials = _.map(prep_paths, function(n,i) {
+      return trial = {
+        type: jsPsychImageButtonResponse,
+        prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
+        choices: choices,
+        stimulus: n.path,
+        button_html: () => {
+          return (_.map(choices, (choice) => {
+            return `<button class="jspsych-btn">${choice}</button>`
+          }));
+        },
+        data: {
+          catch_trial: false,
+          prep_trial: true,
+          sketcher_category: n.category,
+        },
+        post_trial_gap: 500,
+        on_finish: (data) => {
+          jsPsych.data.addDataToLastTrial({
+            response_category: choices[data.response],
+            participant_id: prolificID,
+          });
+        },
+      };
+    });
+
+    // add catch trials to trial list, randomly distributed
+    catchtrials.forEach((trial) => {
+      rawTrials.splice(Math.floor(Math.random() * rawTrials.length), 0, trial);
+    });
+
+    for (let i = 0; i < preptrials.length; i++) {
+      rawTrials.unshift(preptrials[i]);
+    };
+    
+    // add trialNum to trial list with catch trials included now
+    rawTrials = rawTrials.map((n,i) => {
+      const o = Object.assign({}, n);
+      o.trialNum = i
+      return o
+    });
+
+    let trials = _.flatten(_.map(rawTrials, function(trialData, i) {
+      const trial = _.extend({}, additionalInfo, trialData, {trialNum: i}); 
+        return trial;
+      })); 	
+
+    callback(trials);
+  };
+
+  // Define consent form language             
+  consentHTML = {    
+    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 15 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $3.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+  }
+  // Define instructions language
+  instructionsHTML = {  
+    'str1' : "<p id = 'tightinstruction'> We are interested in your ability to recognize a drawing --- specifically, how accurately you can match a drawing to its label.</p> <p> In total, you will be asked to rate 72 sketches.</p>",
+    'str2' : '<p id = "exampleprompt"> On each trial you will be shown an drawing and 12 category labels (e.g. "CAT"). Your job will be to select the category that matches the drawing. Here is an example of a trial: <br> <img id="exampleimg" height = "400px" style = "border: solid black" src = "stimuli/example_trial.png"></p>',
+    'str3' : "<p> Please adjust your screen (by zooming in/out) such that the drawings and labels are not blocked in any way.</p> <p>In total, this study should take around 15 minutes. Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://cogtoolslab.requester@gmail.com'>(cogtoolslab.requester@gmail.com)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
+  }  
+
+
+  // Create consent + instructions instructions trial
+  const welcome = {
+    type: jsPsychInstructions,
+    pages: [
+      consentHTML.str1,
+      instructionsHTML.str1,
+      instructionsHTML.str2,
+      instructionsHTML.str3,
+    ],
+    force_wait: 2000, 
+    show_clickable_nav: true,
+    allow_keys: false,
+    allow_backward: false
+  };
+
+  /*
+  // exit survey trials
+  const surveyChoiceInfo = _.omit(_.extend({}, additionalInfo, new Experiment),['type','dev_mode']);  
+  const exitSurveyChoice = _.extend( {}, surveyChoiceInfo, {
+    type: jsPsychSurveyMultiChoice,
+    preamble: "<strong><u>Exit Survey</u></strong>",
+    questions: [
+      {prompt: "What is your sex?",
+        name: "participantSex",
+        horizontal: false,
+        options: ["Male", "Female", "Neither/Other/Do Not Wish To Say"],
+        required: true
+      },
+      {prompt: "Which of the following did you use to make these labels?",
+        name: "inputDevice",
+        horizontal: false,
+        options: ["Mouse", "Trackpad", "Touch Screen", "Stylus", "Other"],
+        required: true
+      }
+    ],
+    on_finish: main_on_finish
+  });
+
+  // Add survey page after trials are done
+  const surveyTextInfo = _.omit(_.extend({}, additionalInfo, new Experiment),['type','dev_mode']);
+  const exitSurveyText =  _.extend({}, surveyTextInfo, {
+    type: jsPsychSurveyText,
+    preamble: "<strong><u>Exit Survey</u></strong>",
+    questions: [
+    { name: 'participantAge', 
+      prompt: "Please enter your age", 
+      placeholder: "e.g. 32",
+      required: true
+    },        
+    { name: 'participantComments', 
+      prompt: "Thank you for participating in our study! Do you have any other comments or feedback to share with us about your experience?", 
+      placeholder: "I had a lot of fun!",
+      rows: 5, 
+      columns: 50,
+      required: false
+    }
+    ],
+    on_finish: main_on_finish
+  }); 
+  */
+
+  const filename = `${prolificID || Math.floor(Math.random() * 10000000000)}.csv`;
+  
+  const save_data = {
+    type: jsPsychPipe,
+    action: "save",
+    experiment_id: "c6Ea6z7ZniUx",
+    filename: filename,
+    data_string: () => jsPsych.data.get().csv()
+  };
+
+  // Create goodbye trial (this doesn't close the browser yet)
+  const goodbye = {
+    type: jsPsychInstructions,
+    pages: [
+      'Thanks for participating in our experiment! You are all done now. Please click the button to be redirected to the prolific app (this will record your completion of the study).'
+            ],
+    show_clickable_nav: true,
+    allow_backward: false,
+    button_label_next: 'Submit',    
+    on_finish: () => { 
+      console.log(jsPsych.data)
+      //window.open()
+    }
+  }
+
+
+  function addBookends(trials) {
+    // // add welcome trial to start of survey
+    trials.unshift(welcome);
+    
+    /*
+    // // append exit surveys
+    trials.push(exitSurveyChoice);
+    trials.push(exitSurveyText);
+    */
+
+    // save data
+    trials.push(save_data);
+    // append goodbye trial
+    trials.push(goodbye);
+
+    jsPsych.run(trials);
+  }
+
+
+  // create trials list and add instrutions and exit survey
+  createTrialsList(function (rawTrials) {
+    createCatchTrials(function (trials) {
+      addBookends(trials);
+    })
+  })
+}
+
+
