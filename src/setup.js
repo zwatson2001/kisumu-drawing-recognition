@@ -1,4 +1,4 @@
-function setupGame() {
+async function setupGame() {
   const jsPsych = initJsPsych({
         default_iti: 1000,
         show_progress_bar: true
@@ -37,24 +37,132 @@ function setupGame() {
     'Watch'
   ];
 
+  AWS.config.region = 'us-west-1';
+  AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
+  const dynamoDB = new AWS.DynamoDB.DocumentClient();
+
+  async function getCount(drawingId) {
+    const params = {
+      TableName: 'kisumu-drawing-counts', 
+      Key: {drawingId: drawingId}
+    }
+
+    try {
+      const data = await dynamoDB.get(params).promise(); 
+      return data.Item.count;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+/*
+  async function updateCount(currValue, drawingId) {
+    const params = {
+      TableName: 'kisumu-drawing-counts', 
+      Key: {drawingId: drawingId}, 
+      UpdateExpression: `set #a = :x`, 
+      ExpressionAttributeNames: {
+        "#a": "count"
+      }, 
+      ExpressionAttributeValues: {
+        ":x": (currValue + 1)
+      }
+    } 
+
+    try {
+      data = await dynamoDB.update(params).promise();
+      return data;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function resetCount(drawingId) {
+    const params = {
+      TableName: 'kisumu-drawing-counts', 
+      Key: {drawingId: drawingId}, 
+      UpdateExpression: `set #a = :x`, 
+      ExpressionAttributeNames: {
+        "#a": "count"
+      }, 
+      ExpressionAttributeValues: {
+        ":x": 0
+      }
+    } 
+
+    try {
+      data = await dynamoDB.update(params).promise();
+      return data;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  stimuli.forEach(async (stim) => {
+    resetCount(stim.file.split(".")[0]); 
+  })
+*/
   // change this if running with new drawings
   const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
 
-  // select random subset of stimuli
+  function updateProgressBar(){
+    const fill = document.getElementById("fill"); 
+    const progBar = document.getElementById("progress-bar");
+
+    const progBarWidth = progBar.offsetWidth;
+    const fillWidth = fill.offsetWidth;
+    const origWidth = fillWidth / progBarWidth * 100; 
+    let newWidth = origWidth + 2;
+    if (newWidth > 100) {
+      newWidth = 100; 
+    }
+    fill.style.width = `${newWidth}%`;
+  }
+  
+  // pick a stimulus that has not already been shown to 10 participants
+  async function selectStimulus(options) {
+    let stimSelected = false; 
+
+    for (let i = 0; i < options.length; i++) {
+      const stim = options[i];
+      const stimId = stim.file.split(".")[0];
+      const stimCount = await getCount(stimId); 
+      
+      if (stimCount < 10) {
+        randomSubset.push(stim); 
+        await updateCount(stimCount, stimId); 
+        stimSelected = true;
+        updateProgressBar();
+        break; 
+      }
+    }
+
+    // pick a random stimulus if none of them meet the criteria
+    if (!stimSelected) {
+      randomSubset.push(options[Math.floor(Math.random() * options.length)]); 
+    }
+  }
+
   let randomSubset = [];
-  choices.forEach((category => {
-    for (i = 0; i < ageGroupIds.length; i++) {
-      const range = ageGroupIds[i];
+  // select random subset of stimuli - one from each category x age group combination
+  for (let i = 0; i < choices.length; i++) {
+    const category = choices[i];
+    for (let j = 0; j < ageGroupIds.length; j++) {
+      const range = ageGroupIds[j];
       const ageGroup = stimuli.filter((stim) => {
         return (
           (Number(stim.participant_id) >= range[0] && Number(stim.participant_id) <= range[1]) &&
           (stim.english === category)
-        );
+        )
       });
-      
-      randomSubset.push(ageGroup[Math.floor(Math.random() * ageGroup.length)]);
+
+      await selectStimulus(ageGroup);
     }
-  }));
+    updateProgressBar();
+  }
+  
+  const progBar = document.getElementById("progress-bar"); 
+  progBar.remove();
+
   randomSubset = _.shuffle(randomSubset);
   
   // Create raw trials list
