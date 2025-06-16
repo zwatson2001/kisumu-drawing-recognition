@@ -54,7 +54,7 @@ async function setupGame() {
       console.log(error);
     }
   }
-/*
+
   async function updateCount(currValue, drawingId) {
     const params = {
       TableName: 'kisumu-drawing-counts', 
@@ -75,7 +75,7 @@ async function setupGame() {
       console.log(error);
     }
   }
-
+/*
   async function resetCount(drawingId) {
     const params = {
       TableName: 'kisumu-drawing-counts', 
