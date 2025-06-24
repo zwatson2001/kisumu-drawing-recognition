@@ -4,12 +4,16 @@ async function setupGame() {
         show_progress_bar: true
     });    
 
-  // get experiment ID information from URL
-  const queryString = window.location.search;
-  const urlParams = new URLSearchParams(queryString);
-  const prolificID = urlParams.get('PROLIFIC_PID')   // ID unique to the participant
-  const studyID = urlParams.get('STUDY_ID')          // ID unique to the study
-  const sessionID = urlParams.get('SESSION_ID')      // ID unique to the particular submission
+  // capture info from Prolific
+  const prolificID = jsPsych.data.getURLVariable('PROLIFIC_PID');
+  const studyID = jsPsych.data.getURLVariable('STUDY_ID');
+  const sessionID = jsPsych.data.getURLVariable('SESSION_ID');
+
+  jsPsych.data.addProperties({
+    study_id: studyID, 
+    session_id: sessionID, 
+    participant_id: prolificID
+  });
   
   const main_on_finish = function(data) {
     console.log('emitting trial data', data)
@@ -18,7 +22,7 @@ async function setupGame() {
   const additionalInfo = {
     prolificID: prolificID,
     studyID: studyID,
-    sessionID: sessionID,  // this is the same as gameID
+    sessionID: sessionID,
     on_finish: main_on_finish
   }  
 
@@ -188,8 +192,7 @@ async function setupGame() {
         },
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
-            response_category: choices[data.response], 
-            participant_id: prolificID,
+            response_category: choices[data.response]
           });
         },
        };
@@ -224,8 +227,7 @@ async function setupGame() {
         post_trial_gap: 500,
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
-            response_category: choices[data.response],
-            participant_id: prolificID,
+            response_category: choices[data.response]
           });
         },
       };
@@ -255,8 +257,7 @@ async function setupGame() {
         post_trial_gap: 500,
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
-            response_category: choices[data.response],
-            participant_id: prolificID,
+            response_category: choices[data.response]
           });
         },
       };
