@@ -41,55 +41,58 @@ async function setupGame() {
     'Watch'
   ];
 
+  /*
+  // code for regenerating participant assigments
+  let currParticipant = 1;
+  const finalList = [];
+  let currList = [];
+  participantsPerRun.forEach((stim) => {
+    console.log(stim.participant);
+    if (Number(stim.participant) > currParticipant) {
+      finalList.push(_.shuffle(currList)); 
+      currList = [];
+      currParticipant += 1;
+    }
+
+    const entry = stimuli.filter((fullStim) => {
+      return fullStim.file === stim.sketch_id
+    })
+    console.log(entry.length); 
+    currList.push(entry[0])
+  })
+  finalList.push(_.shuffle(currList)); 
+
+console.log(JSON.stringify(finalList));
+*/
+
   AWS.config.region = 'us-west-1';
   AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
   const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
-  async function getCount(drawingId) {
+  async function getAssigned(participantNumber) {
     const params = {
-      TableName: 'kisumu-drawing-counts', 
-      Key: {drawingId: drawingId}
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}
     }
 
     try {
       const data = await dynamoDB.get(params).promise(); 
-      return data.Item.count;
+      return data.Item.assigned;
     } catch (error) {
       console.log(error);
     }
   }
 
-  async function updateCount(currValue, drawingId) {
+  async function updateAssigned(participantNumber) {
     const params = {
-      TableName: 'kisumu-drawing-counts', 
-      Key: {drawingId: drawingId}, 
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}, 
       UpdateExpression: `set #a = :x`, 
       ExpressionAttributeNames: {
-        "#a": "count"
+        "#a": "assigned"
       }, 
       ExpressionAttributeValues: {
-        ":x": (currValue + 1)
-      }
-    } 
-
-    try {
-      data = await dynamoDB.update(params).promise();
-      return data;
-    } catch (error) {
-      console.log(error);
-    }
-  }
-/*
-  async function resetCount(drawingId) {
-    const params = {
-      TableName: 'kisumu-drawing-counts', 
-      Key: {drawingId: drawingId}, 
-      UpdateExpression: `set #a = :x`, 
-      ExpressionAttributeNames: {
-        "#a": "count"
-      }, 
-      ExpressionAttributeValues: {
-        ":x": 0
+        ":x": true
       }
     } 
 
@@ -101,78 +104,27 @@ async function setupGame() {
     }
   }
 
-  stimuli.forEach(async (stim) => {
-    resetCount(stim.file.split(".")[0]); 
-  })
-*/
-  // change this if running with new drawings
-  const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
+  // select first unassigned run number
+  let runNumber;
+  for (let i = 1; i < 29; i++) {
+    const assigned = await getAssigned(i); 
 
-  function updateProgressBar(){
-    const fill = document.getElementById("fill"); 
-    const progBar = document.getElementById("progress-bar");
-
-    const progBarWidth = progBar.offsetWidth;
-    const fillWidth = fill.offsetWidth;
-    const origWidth = fillWidth / progBarWidth * 100; 
-    let newWidth = origWidth + 2;
-    if (newWidth > 100) {
-      newWidth = 100; 
-    }
-    fill.style.width = `${newWidth}%`;
-  }
-  
-  // pick a stimulus that has not already been shown to 10 participants
-  async function selectStimulus(options) {
-    let stimSelected = false; 
-
-    for (let i = 0; i < options.length; i++) {
-      const stim = options[i];
-      const stimId = stim.file.split(".")[0];
-      const stimCount = await getCount(stimId); 
-      
-      if (stimCount < 10) {
-        randomSubset.push(stim); 
-        await updateCount(stimCount, stimId); 
-        stimSelected = true;
-        updateProgressBar();
-        break; 
-      }
-    }
-
-    // pick a random stimulus if none of them meet the criteria
-    if (!stimSelected) {
-      randomSubset.push(options[Math.floor(Math.random() * options.length)]); 
+    if (!assigned) {
+      runNumber = i;
+      break
     }
   }
 
-  let randomSubset = [];
-  // select random subset of stimuli - one from each category x age group combination
-  for (let i = 0; i < choices.length; i++) {
-    const category = choices[i];
-    for (let j = 0; j < ageGroupIds.length; j++) {
-      const range = ageGroupIds[j];
-      const ageGroup = stimuli.filter((stim) => {
-        return (
-          (Number(stim.participant_id) >= range[0] && Number(stim.participant_id) <= range[1]) &&
-          (stim.english === category)
-        )
-      });
-
-      await selectStimulus(ageGroup);
-    }
-    updateProgressBar();
+  if (runNumber == undefined) {
+    runNumber = Math.floor(Math.random() * 28) + 1;
   }
-  
-  const progBar = document.getElementById("progress-bar"); 
-  progBar.remove();
 
-  randomSubset = _.shuffle(randomSubset);
+  const subset = secondRoundStimuli[runNumber - 1];
   
   // Create raw trials list
   let rawTrials = [];
   function createTrialsList(callback) {      
-    randomSubset.forEach((stim) => {
+    subset.forEach((stim) => {
       const trial = {
         type: jsPsychImageButtonResponse,
         prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
@@ -201,7 +153,7 @@ async function setupGame() {
     });
 
     callback(rawTrials) // add catch trials
-  };
+  }; 
 
   function createCatchTrials(callback) {
     // manually create a catch trial metadata object
@@ -332,7 +284,8 @@ async function setupGame() {
     show_clickable_nav: true,
     allow_backward: false,
     button_label_next: 'Submit',    
-    on_finish: () => {
+    on_finish: async () => {
+      await updateAssigned(runNumber); 
       window.location = "https://app.prolific.com/submissions/complete?cc=C13GQ4M8"
     }
   }
