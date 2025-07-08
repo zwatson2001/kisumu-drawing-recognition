@@ -286,7 +286,7 @@ console.log(JSON.stringify(finalList));
     button_label_next: 'Submit',    
     on_finish: async () => {
       await updateAssigned(runNumber); 
-      window.location = "https://app.prolific.com/submissions/complete?cc=C13GQ4M8"
+      window.location = "https://app.prolific.com/submissions/complete?cc=C8S1IH9E"
     }
   }
 
