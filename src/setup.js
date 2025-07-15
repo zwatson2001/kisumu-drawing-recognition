@@ -40,6 +40,7 @@ async function setupGame() {
     'Tree', 
     'Watch'
   ];
+
 /*
   // code for regenerating participant assigments
   let currParticipant = 1;
@@ -64,10 +65,66 @@ async function setupGame() {
 console.log(JSON.stringify(finalList));
 */
 
+  AWS.config.region = 'us-west-1';
+  AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
+  const dynamoDB = new AWS.DynamoDB.DocumentClient();
+
+  async function getAssigned(participantNumber) {
+    const params = {
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}
+    }
+
+    try {
+      const data = await dynamoDB.get(params).promise(); 
+      return data.Item.assigned;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function updateAssigned(participantNumber) {
+    const params = {
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}, 
+      UpdateExpression: `set #a = :x`, 
+      ExpressionAttributeNames: {
+        "#a": "assigned"
+      }, 
+      ExpressionAttributeValues: {
+        ":x": true
+      }
+    } 
+
+    try {
+      data = await dynamoDB.update(params).promise();
+      return data;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  // select first unassigned run number
+  let runNumber;
+  for (let i = 1; i < 3; i++) {
+    const assigned = await getAssigned(i); 
+
+    if (!assigned) {
+      runNumber = i;
+      break
+    }
+  }
+
+  if (runNumber == undefined) {
+    runNumber = Math.floor(Math.random() * 2) + 1;
+  }
+
+  const subset = secondRoundStimuli[runNumber - 1];
+
   // Create raw trials list
   let rawTrials = [];
   function createTrialsList(callback) {      
-    secondRoundStimuli.forEach((stim) => {
+    subset.forEach((stim) => {
       const trial = {
         type: jsPsychImageButtonResponse,
         prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
@@ -228,7 +285,8 @@ console.log(JSON.stringify(finalList));
     allow_backward: false,
     button_label_next: 'Submit',    
     on_finish: async () => {
-      window.location = "https://app.prolific.com/submissions/complete?cc=CI5H8RGF"
+      await updateAssigned();
+      window.location = "https://app.prolific.com/submissions/complete?cc=CN7PC0EZ"
     }
   }
 
