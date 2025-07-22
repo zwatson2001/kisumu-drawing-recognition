@@ -103,23 +103,8 @@ console.log(JSON.stringify(finalList));
       console.log(error);
     }
   }
-
-  // select first unassigned run number
-  let runNumber;
-  for (let i = 1; i < 3; i++) {
-    const assigned = await getAssigned(i); 
-
-    if (!assigned) {
-      runNumber = i;
-      break
-    }
-  }
-
-  if (runNumber == undefined) {
-    runNumber = Math.floor(Math.random() * 2) + 1;
-  }
-
-  const subset = secondRoundStimuli[runNumber - 1];
+  
+  const subset = secondRoundStimuli[1];
 
   // Create raw trials list
   let rawTrials = [];
@@ -285,8 +270,7 @@ console.log(JSON.stringify(finalList));
     allow_backward: false,
     button_label_next: 'Submit',    
     on_finish: async () => {
-      await updateAssigned(runNumber);
-      window.location = "https://app.prolific.com/submissions/complete?cc="
+      window.location = "https://app.prolific.com/submissions/complete?cc=C1NWQ4TJ"
     }
   }
 
