@@ -28,38 +28,14 @@ async function setupGame() {
 
   const choices = ["1", "2", "3", "4", "5"];
 
-/*
-  // code for regenerating participant assigments
-  let currParticipant = 1;
-  const finalList = [];
-  let currList = [];
-  participantsPerRun.forEach((stim) => {
-    console.log(stim.participant);
-    if (Number(stim.participant) > currParticipant) {
-      finalList.push(_.shuffle(currList)); 
-      currList = [];
-      currParticipant += 1;
-    }
-
-    const entry = stimuli.filter((fullStim) => {
-      return fullStim.file === stim.sketch_id
-    })
-    console.log(entry.length); 
-    currList.push(entry[0])
-  })
-  finalList.push(_.shuffle(currList)); 
-
-console.log(JSON.stringify(finalList));
-*/
-
   AWS.config.region = 'us-west-1';
   AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
   const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
-  async function getCount(drawingId) {
+  async function getCount(tracingId) {
     const params = {
       TableName: 'kisumu-tracing-counts', 
-      Key: {drawingId: drawingId}
+      Key: {tracingId: tracingId}
     }
 
     try {
@@ -70,10 +46,10 @@ console.log(JSON.stringify(finalList));
     }
   }
 
-  async function updateCount(currValue, drawingId) {
+  async function updateCount(currValue, tracingId) {
     const params = {
       TableName: 'kisumu-tracing-counts', 
-      Key: {drawingId: drawingId}, 
+      Key: {tracingId: tracingId}, 
       UpdateExpression: `set #a = :x`, 
       ExpressionAttributeNames: {
         "#a": "count"
@@ -90,11 +66,12 @@ console.log(JSON.stringify(finalList));
       console.log(error);
     }
   }
-/*
-  async function resetCount(drawingId) {
+
+  /*
+  async function resetCount(tracingId) {
     const params = {
       TableName: 'kisumu-tracing-counts', 
-      Key: {drawingId: drawingId}, 
+      Key: {tracingId: tracingId}, 
       UpdateExpression: `set #a = :x`, 
       ExpressionAttributeNames: {
         "#a": "count"
@@ -113,9 +90,9 @@ console.log(JSON.stringify(finalList));
   }
 
   stimuli.forEach(async (stim) => {
-    resetCount(stim.file.split(".")[0]); 
+    resetCount(stim.file_name.split(".")[0]); 
   })
-*/
+  */
 
   function updateProgressBar(){
     const fill = document.getElementById("fill"); 
@@ -133,48 +110,56 @@ console.log(JSON.stringify(finalList));
   
   // pick a stimulus that has not already been shown to 10 participants
   async function selectStimulus(options) {
-    let stimSelected = false; 
+    let stimSelected; 
 
     for (let i = 0; i < options.length; i++) {
       const stim = options[i];
-      const stimId = stim.file.split(".")[0];
+      const stimId = stim.file_name.split(".")[0];
       const stimCount = await getCount(stimId); 
       
       if (stimCount < 10) {
         randomSubset.push(stim); 
-        await updateCount(stimCount, stimId); 
-        stimSelected = true;
+        stimSelected = stimId;
         updateProgressBar();
         break; 
       }
     }
 
     // pick a random stimulus if none of them meet the criteria
-    if (!stimSelected) {
-      randomSubset.push(options[Math.floor(Math.random() * options.length)]); 
+    if (stimSelected == undefined) {
+      const stim = options[Math.floor(Math.random() * options.length)];
+      randomSubset.push(stim); 
+      stimSelected = stim.file_name.split(".")[0];
     }
+
+    return stimSelected;
   }
 
   let randomSubset = [];
-  // select random subset of stimuli - one from each category x age group combination
+  // select random subset of stimuli - two from each category x age group combination
   for (let i = 1; i <= 5; i++) {
     for (let j = 4; j <= 9; j++) {
       const ageGroup = stimuli.filter((stim) => {
         return (
-          stim.age == toString(j)  &&
-          (stim.tracing_type === toString(i))
+          (+stim.participant_age == j)  &&
+          (+stim.tracing_type === i)
         )
       });
+      
+      // select two stimuli per group - not the same one
+      const firstStimId = await selectStimulus(ageGroup);
 
-      await selectStimulus(ageGroup);
+      const secondStimOptions = ageGroup.filter((stim) => {
+        return (stim.file_name.split(".")[0] !== firstStimId)
+      })
+
+      await selectStimulus(secondStimOptions);
     }
     updateProgressBar();
   }
   
   const progBar = document.getElementById("progress-bar"); 
   progBar.remove();
-
-  randomSubset = _.shuffle(randomSubset);
   
   // Create raw trials list
   let rawTrials = [];
@@ -189,7 +174,7 @@ console.log(JSON.stringify(finalList));
             return `<button class="jspsych-btn">${choice}</button>`
           }));
         },
-        stimulus: `https://kisumu-tracings.s3-us-west-1.amazonaws.com/${stim.file}`,
+        stimulus: `https://kisumu-drawings.s3-us-west-1.amazonaws.com/tracings/${stim.file_name}`,
         post_trial_gap: 500,
         data: {
           tracing_type: stim.tracing_type,
@@ -239,37 +224,7 @@ console.log(JSON.stringify(finalList));
         },
       };
     });
-    /*
-    prep_paths = [
-      {'category': 'cat', 'path': 'stimuli/prep_trials/0_cat_prep.jpg'},
-      {'category': 'car', 'path': 'stimuli/prep_trials/1_car_prep.png'},
-    ];
 
-    preptrials = _.map(prep_paths, function(n,i) {
-      return trial = {
-        type: jsPsychImageButtonResponse,
-        prompt: "<p id = promptid>Which category does this drawing belong to?</p>",
-        choices: choices,
-        stimulus: n.path,
-        button_html: () => {
-          return (_.map(choices, (choice) => {
-            return `<button class="jspsych-btn">${choice}</button>`
-          }));
-        },
-        data: {
-          catch_trial: false,
-          prep_trial: true,
-          sketcher_category: n.category,
-        },
-        post_trial_gap: 500,
-        on_finish: (data) => {
-          jsPsych.data.addDataToLastTrial({
-            response_category: choices[data.response]
-          });
-        },
-      };
-    });
-    */
     // add catch trials to trial list, randomly distributed
     catchtrials.forEach((trial) => {
       rawTrials.splice(Math.floor(Math.random() * rawTrials.length), 0, trial);
@@ -298,12 +253,14 @@ console.log(JSON.stringify(finalList));
 
   // Define consent form language             
   consentHTML = {    
-    'str1' : '<p> Hello! In this study, you will be asked to rate the quality of a series of tracings! </p><p> We expect the average game to last about 15 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $2.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+    'str1' : '<p> Hello! In this study, you will be asked to rate the quality of a series of 60 tracings! </p><p> We expect the average game to last about 10 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $2.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
   }
   // Define instructions language
   instructionsHTML = {  
-    'str1' : "<p id = 'tightinstruction'> .<p> In total, you will be asked to rate 60 tracings. <p id = 'exampleprompt'> On each trial you will be shown a blue tracing of a gray background object. Please give the tracing a rating from 1 (very bad) to 5 (very good) based on how well the blue lines follow the gray lines.</p>",
-    'str2' : "<p> Please adjust your screen (by zooming in/out) such that the tracings and rating buttons are not blocked in any way.</p> <p>In total, this study should take around 10 minutes. Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
+    'str1' : "<p id = 'exampleprompt'> On each trial you will be shown a blue tracing of a gray background object. Please give the tracing a rating from 1 (very bad) to 5 (very good) based on how much the blue lines overlap with the gray lines.</p>",
+    'str2' : "<p> Here is an example of a high-quality tracing: </p><img src='stimuli/examples/example_good.png'; height='400px'></img>",
+    'str3' : "<p> Here is an example of a low-quality tracing: </p><img src='stimuli/examples/example_bad.png'; height='400px'></img>",
+    'str4' : "<p> Please adjust your screen (by zooming in/out) such that the tracings and rating buttons are not blocked in any way.</p> <p> Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
   }  
 
   // Create consent + instructions instructions trial
@@ -313,6 +270,8 @@ console.log(JSON.stringify(finalList));
       consentHTML.str1,
       instructionsHTML.str1,
       instructionsHTML.str2,
+      instructionsHTML.str3,
+      instructionsHTML.str4,
     ],
     force_wait: 2000, 
     show_clickable_nav: true,
@@ -327,7 +286,14 @@ console.log(JSON.stringify(finalList));
     action: "save",
     experiment_id: "c6Ea6z7ZniUx",
     filename: filename,
-    data_string: () => jsPsych.data.get().csv()
+    data_string: () => jsPsych.data.get().csv(), 
+    on_load: async () => {
+      for (let i = 0; i < randomSubset.length; i++) {
+        const stimId = randomSubset[i].file_name.split(".")[0];
+        const currValue = await getCount(stimId);
+        await updateCount(currValue, stimId)
+      }
+    }
   };
 
   // Create goodbye trial (this doesn't close the browser yet)
@@ -340,7 +306,6 @@ console.log(JSON.stringify(finalList));
     allow_backward: false,
     button_label_next: 'Submit',    
     on_finish: async () => {
-      await updateAssigned(runNumber);
       window.location = "https://app.prolific.com/submissions/complete?cc="
     }
   }
