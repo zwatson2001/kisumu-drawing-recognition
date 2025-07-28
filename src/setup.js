@@ -27,6 +27,7 @@ async function setupGame() {
   }  
 
   const choices = ["1", "2", "3", "4", "5"];
+  const buttonText = ["1 (very bad)", "2 (bad)", "3 (neither good nor bad)", "4 (good)", "5 (very good)"]
 
   AWS.config.region = 'us-west-1';
   AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
@@ -135,6 +136,30 @@ async function setupGame() {
     return stimSelected;
   }
 
+  function doOnLoad() {
+    // equalize button sizes
+    const buttons = document.querySelectorAll('button')
+    const buttonSizes = [];
+    buttons.forEach((button) => {
+      buttonSizes.push(button.clientWidth);
+      console.log(button.clientWidth);
+    });
+    
+    const size = Math.max(...buttonSizes);
+    buttons.forEach((button) => {
+      button.style = `width:${size}px`; 
+      console.log(`width:${size}px`)
+    });
+    
+    const content = document.getElementById('jspsych-content');
+    content.style.display = "flex"; 
+    content.style.alignItems = "center";
+    content.style.flexDirection = "column";
+    const buttonContainer = document.getElementById('jspsych-image-button-response-btngroup'); 
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.alignItems = "center";
+  }
+
   let randomSubset = [];
   // select random subset of stimuli - two from each category x age group combination
   for (let i = 1; i <= 5; i++) {
@@ -157,6 +182,7 @@ async function setupGame() {
     }
     updateProgressBar();
   }
+  randomSubset = _.shuffle(randomSubset);
   
   const progBar = document.getElementById("progress-bar"); 
   progBar.remove();
@@ -167,11 +193,11 @@ async function setupGame() {
     randomSubset.forEach((stim) => {
       const trial = {
         type: jsPsychImageButtonResponse,
-        prompt: "<p id = promptid>Please give this tracing a rating from 1 (very bad) to 5 (very good).</p>",
+        prompt: "<p id = promptid>Please give this tracing a rating from 1 to 5.</p>",
         choices: choices,
         button_html: () => {
-          return (_.map(choices, (choice) => {
-            return `<button class="jspsych-btn">${choice}</button>`
+          return (_.map(buttonText, (choice) => {
+            return `<button class="jspsych-btn" style="width:auto">${choice}</button>`
           }));
         },
         stimulus: `https://kisumu-drawings.s3-us-west-1.amazonaws.com/tracings/${stim.file_name}`,
@@ -182,6 +208,7 @@ async function setupGame() {
           catch_trial: false, 
           prep_trial: false,
         },
+        on_load: doOnLoad,
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
             response: choices[data.response]
@@ -203,11 +230,11 @@ async function setupGame() {
     catchtrials = _.map(catch_paths, function(n,i) {
       return trial = {
         type: jsPsychImageButtonResponse,
-        prompt: "<p id = promptid>Please give this tracing a rating from 1 (very bad) to 5 (very good).</p>",
+        prompt: "<p id = promptid>Please give this tracing a rating from 1 to 5.</p>",
         choices: choices,
         button_html: () => {
-          return (_.map(choices, (choice) => {
-            return `<button class="jspsych-btn">${choice}</button>`
+          return (_.map(buttonText, (choice) => {
+            return `<button class="jspsych-btn" style="width:auto">${choice}</button>`
           }));
         },
         stimulus: n.path,
@@ -216,6 +243,7 @@ async function setupGame() {
           prep_trial: false,
           sketcher_category: n.category,
         },
+        on_load: doOnLoad,
         post_trial_gap: 500,
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
