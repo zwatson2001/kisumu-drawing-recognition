@@ -334,7 +334,7 @@ async function setupGame() {
     allow_backward: false,
     button_label_next: 'Submit',    
     on_finish: async () => {
-      window.location = "https://app.prolific.com/submissions/complete?cc="
+      window.location = "https://app.prolific.com/submissions/complete?cc=C18GSJ0Y"
     }
   }
 
