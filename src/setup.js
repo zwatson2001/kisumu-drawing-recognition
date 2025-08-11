@@ -33,30 +33,30 @@ async function setupGame() {
   AWS.config.credentials = new AWS.CognitoIdentityCredentials({IdentityPoolId: 'us-west-1:6c98f036-704d-43ee-8919-a87026a2ad3a'});
   const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
-  async function getCount(tracingId) {
+  async function getAssigned(participantNumber) {
     const params = {
-      TableName: 'kisumu-tracing-counts', 
-      Key: {tracingId: tracingId}
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}
     }
 
     try {
       const data = await dynamoDB.get(params).promise(); 
-      return data.Item.count;
+      return data.Item.assigned;
     } catch (error) {
       console.log(error);
     }
   }
 
-  async function updateCount(currValue, tracingId) {
+  async function updateAssigned(participantNumber) {
     const params = {
-      TableName: 'kisumu-tracing-counts', 
-      Key: {tracingId: tracingId}, 
+      TableName: 'stimulus-assignments', 
+      Key: {participantNumber: participantNumber}, 
       UpdateExpression: `set #a = :x`, 
       ExpressionAttributeNames: {
-        "#a": "count"
+        "#a": "assigned"
       }, 
       ExpressionAttributeValues: {
-        ":x": (currValue + 1)
+        ":x": true
       }
     } 
 
@@ -66,74 +66,6 @@ async function setupGame() {
     } catch (error) {
       console.log(error);
     }
-  }
-
-  /*
-  async function resetCount(tracingId) {
-    const params = {
-      TableName: 'kisumu-tracing-counts', 
-      Key: {tracingId: tracingId}, 
-      UpdateExpression: `set #a = :x`, 
-      ExpressionAttributeNames: {
-        "#a": "count"
-      }, 
-      ExpressionAttributeValues: {
-        ":x": 0
-      }
-    } 
-
-    try {
-      data = await dynamoDB.update(params).promise();
-      return data;
-    } catch (error) {
-      console.log(error);
-    }
-  }
-
-  stimuli.forEach(async (stim) => {
-    resetCount(stim.file_name.split(".")[0]); 
-  })
-  */
-
-  function updateProgressBar(){
-    const fill = document.getElementById("fill"); 
-    const progBar = document.getElementById("progress-bar");
-
-    const progBarWidth = progBar.offsetWidth;
-    const fillWidth = fill.offsetWidth;
-    const origWidth = fillWidth / progBarWidth * 100; 
-    let newWidth = origWidth + 2;
-    if (newWidth > 100) {
-      newWidth = 100; 
-    }
-    fill.style.width = `${newWidth}%`;
-  }
-  
-  // pick a stimulus that has not already been shown to 10 participants
-  async function selectStimulus(options) {
-    let stimSelected; 
-
-    for (let i = 0; i < options.length; i++) {
-      const stim = options[i];
-      const stimId = stim.file_name.split(".")[0];
-      const stimCount = await getCount(stimId); 
-      
-      if (stimCount < 10) {
-        randomSubset.push(stim); 
-        stimSelected = stimId;
-        updateProgressBar();
-        break; 
-      }
-    }
-
-    // pick a random stimulus if none of them meet the criteria
-    if (stimSelected == undefined) {
-      const stim = options[Math.floor(Math.random() * options.length)];
-      randomSubset.push(stim); 
-      stimSelected = stim.file_name.split(".")[0];
-    }
-
-    return stimSelected;
   }
 
   function doOnLoad() {
@@ -142,13 +74,11 @@ async function setupGame() {
     const buttonSizes = [];
     buttons.forEach((button) => {
       buttonSizes.push(button.clientWidth);
-      console.log(button.clientWidth);
     });
     
     const size = Math.max(...buttonSizes);
     buttons.forEach((button) => {
       button.style = `width:${size}px`; 
-      console.log(`width:${size}px`)
     });
     
     const content = document.getElementById('jspsych-content');
@@ -160,37 +90,27 @@ async function setupGame() {
     buttonContainer.style.alignItems = "center";
   }
 
-  let randomSubset = [];
-  // select random subset of stimuli - two from each category x age group combination
-  for (let i = 1; i <= 5; i++) {
-    for (let j = 4; j <= 9; j++) {
-      const ageGroup = stimuli.filter((stim) => {
-        return (
-          (+stim.participant_age == j)  &&
-          (+stim.tracing_type === i)
-        )
-      });
-      
-      // select two stimuli per group - not the same one
-      const firstStimId = await selectStimulus(ageGroup);
+  // select first unassigned run number
+  let runNumber;
+  for (let i = 1; i <= 41; i++) {
+    const assigned = await getAssigned(i); 
 
-      const secondStimOptions = ageGroup.filter((stim) => {
-        return (stim.file_name.split(".")[0] !== firstStimId)
-      })
-
-      await selectStimulus(secondStimOptions);
+    if (!assigned) {
+      runNumber = i;
+      break
     }
-    updateProgressBar();
   }
-  randomSubset = _.shuffle(randomSubset);
-  
-  const progBar = document.getElementById("progress-bar"); 
-  progBar.remove();
+
+  if (runNumber == undefined) {
+    runNumber = Math.floor(Math.random() * 41) + 1;
+  }
+
+  const subset = secondRoundStimuli[runNumber - 1];
   
   // Create raw trials list
   let rawTrials = [];
   function createTrialsList(callback) {      
-    randomSubset.forEach((stim) => {
+    subset.forEach((stim) => {
       const trial = {
         type: jsPsychImageButtonResponse,
         prompt: "<p id = promptid>Please give this tracing a rating from 1 to 5.</p>",
@@ -241,13 +161,13 @@ async function setupGame() {
         data: {
           catch_trial: true,
           prep_trial: false,
-          sketcher_category: n.category,
+          tracing_type: 2,
         },
         on_load: doOnLoad,
         post_trial_gap: 500,
         on_finish: (data) => {
           jsPsych.data.addDataToLastTrial({
-            response_category: choices[data.response]
+            response: choices[data.response]
           });
         },
       };
@@ -314,14 +234,7 @@ async function setupGame() {
     action: "save",
     experiment_id: "c6Ea6z7ZniUx",
     filename: filename,
-    data_string: () => jsPsych.data.get().csv(), 
-    on_load: async () => {
-      for (let i = 0; i < randomSubset.length; i++) {
-        const stimId = randomSubset[i].file_name.split(".")[0];
-        const currValue = await getCount(stimId);
-        await updateCount(currValue, stimId)
-      }
-    }
+    data_string: () => jsPsych.data.get().csv(),
   };
 
   // Create goodbye trial (this doesn't close the browser yet)
@@ -334,7 +247,8 @@ async function setupGame() {
     allow_backward: false,
     button_label_next: 'Submit',    
     on_finish: async () => {
-      window.location = "https://app.prolific.com/submissions/complete?cc=C18GSJ0Y"
+      await updateAssigned(runNumber);
+      window.location = "https://app.prolific.com/submissions/complete?cc="
     }
   }
 
