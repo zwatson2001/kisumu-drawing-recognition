@@ -248,7 +248,7 @@ async function setupGame() {
     button_label_next: 'Submit',    
     on_finish: async () => {
       await updateAssigned(runNumber);
-      window.location = "https://app.prolific.com/submissions/complete?cc="
+      window.location = "https://app.prolific.com/submissions/complete?cc=CM8R3288"
     }
   }
 
