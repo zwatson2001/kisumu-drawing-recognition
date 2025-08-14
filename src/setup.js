@@ -92,7 +92,7 @@ async function setupGame() {
 
   // select first unassigned run number
   let runNumber;
-  for (let i = 1; i <= 41; i++) {
+  for (let i = 1; i <= 2; i++) {
     const assigned = await getAssigned(i); 
 
     if (!assigned) {
@@ -102,7 +102,7 @@ async function setupGame() {
   }
 
   if (runNumber == undefined) {
-    runNumber = Math.floor(Math.random() * 41) + 1;
+    runNumber = Math.floor(Math.random() * 2) + 1;
   }
 
   const subset = secondRoundStimuli[runNumber - 1];
