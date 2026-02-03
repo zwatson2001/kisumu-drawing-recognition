@@ -5,14 +5,14 @@ async function setupGame() {
     });    
 
   // capture info from Prolific
-  const prolificID = jsPsych.data.getURLVariable('PROLIFIC_PID');
-  const studyID = jsPsych.data.getURLVariable('STUDY_ID');
-  const sessionID = jsPsych.data.getURLVariable('SESSION_ID');
+  const assignmentID = jsPsych.data.getURLVariable('assignment_id');
+  const responseID = parseInt(jsPsych.data.getURLVariable('response_id'));
+  const beSampleID = 98041;
+  const completionCode = responseID * beSampleID; 
 
   jsPsych.data.addProperties({
-    study_id: studyID, 
-    session_id: sessionID, 
-    participant_id: prolificID
+    participant_id: assignmentID,
+    response_id: responseID
   });
   
   const main_on_finish = function(data) {
@@ -20,9 +20,8 @@ async function setupGame() {
   }
 
   const additionalInfo = {
-    prolificID: prolificID,
-    studyID: studyID,
-    sessionID: sessionID,
+    assignmentID: assignmentID, 
+    responseID: responseID,
     on_finish: main_on_finish
   }  
 
@@ -56,7 +55,7 @@ async function setupGame() {
         "#a": "assigned"
       }, 
       ExpressionAttributeValues: {
-        ":x": true
+        ":x": (currValue + 1)
       }
     } 
 
@@ -68,32 +67,72 @@ async function setupGame() {
     }
   }
 
-  function doOnLoad() {
-    // equalize button sizes
-    const buttons = document.querySelectorAll('button')
-    const buttonSizes = [];
-    buttons.forEach((button) => {
-      buttonSizes.push(button.clientWidth);
-    });
-    
-    const size = Math.max(...buttonSizes);
-    buttons.forEach((button) => {
-      button.style = `width:${size}px`; 
-    });
-    
-    const content = document.getElementById('jspsych-content');
-    content.style.display = "flex"; 
-    content.style.alignItems = "center";
-    content.style.flexDirection = "column";
-    const buttonContainer = document.getElementById('jspsych-image-button-response-btngroup'); 
-    buttonContainer.style.display = "flex";
-    buttonContainer.style.alignItems = "center";
+  async function resetCount(drawingId) {
+    const params = {
+      TableName: 'kisumu-drawing-counts', 
+      Key: {drawingId: drawingId}, 
+      UpdateExpression: `set #a = :x`, 
+      ExpressionAttributeNames: {
+        "#a": "count"
+      }, 
+      ExpressionAttributeValues: {
+        ":x": 0
+      }
+    } 
+
+    try {
+      data = await dynamoDB.update(params).promise();
+      return data;
+    } catch (error) {
+      console.log(error);
+    }
   }
 
-  // select first unassigned run number
-  let runNumber;
-  for (let i = 1; i <= 2; i++) {
-    const assigned = await getAssigned(i); 
+  /*
+  stimuli.forEach(async (stim) => {
+    resetCount(stim.file.split(".")[0]); 
+  })
+  */
+
+  // change this if running with new drawings
+  const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
+
+  function updateProgressBar(){
+    const fill = document.getElementById("fill"); 
+    const progBar = document.getElementById("progress-bar");
+
+    const progBarWidth = progBar.offsetWidth;
+    const fillWidth = fill.offsetWidth;
+    const origWidth = fillWidth / progBarWidth * 100; 
+    let newWidth = origWidth + 2;
+    if (newWidth > 100) {
+      newWidth = 100; 
+    }
+    fill.style.width = `${newWidth}%`;
+  }
+  
+  // pick a stimulus that has not already been shown to 10 participants
+  async function selectStimulus(options) {
+    let stimSelected = false; 
+    let optionsCopy = options;
+
+    while (optionsCopy.length > 0) {
+      const selectedStim = optionsCopy[Math.floor(Math.random() * optionsCopy.length)]; 
+
+      optionsCopy = optionsCopy.filter((stim) => {
+        stim.file !== selectedStim.file
+      })
+
+      const stimId = selectedStim.file.split(".")[0];
+      const stimCount = await getCount(stimId); 
+      
+      if (stimCount < 10) {
+        randomSubset.push(selectedStim); 
+        stimSelected = true;
+        updateProgressBar();
+        break; 
+      }
+    }
 
     if (!assigned) {
       runNumber = i;
@@ -105,7 +144,9 @@ async function setupGame() {
     runNumber = Math.floor(Math.random() * 2) + 1;
   }
 
-  const subset = secondRoundStimuli[runNumber - 1];
+  console.log(randomSubset);
+
+  randomSubset = _.shuffle(randomSubset);
   
   // Create raw trials list
   let rawTrials = [];
@@ -205,10 +246,20 @@ async function setupGame() {
   }
   // Define instructions language
   instructionsHTML = {  
-    'str1' : "<p id = 'exampleprompt'> On each trial you will be shown a blue tracing of a gray background object. Please give the tracing a rating from 1 (very bad) to 5 (very good) based on how much the blue lines overlap with the gray lines.</p>",
-    'str2' : "<p> Here is an example of a high-quality tracing: </p><img src='stimuli/examples/example_good.png'; height='400px'></img>",
-    'str3' : "<p> Here is an example of a low-quality tracing: </p><img src='stimuli/examples/example_bad.png'; height='400px'></img>",
-    'str4' : "<p> Please adjust your screen (by zooming in/out) such that the tracings and rating buttons are not blocked in any way.</p> <p> Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
+    'str1' : "<p id = 'tightinstruction'> We are interested in your ability to recognize a drawing --- specifically, how accurately you can match a drawing to its label.</p> <p> In total, you will be asked to rate 72 sketches.</p>",
+    'str2' : '<p id = "exampleprompt"> On each trial you will be shown an drawing and 12 category labels (e.g. "CAT"). Your job will be to select the category that matches the drawing.',
+    'str3' : "<p> Please adjust your screen (by zooming in/out) such that the drawings and labels are not blocked in any way.</p> <p>In total, this study should take around 15 minutes. Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>",
+    'str4' : `<p> By answering the following questions, you are participating in a study being performed by
+                  cognitive scientists in the Stanford Department of Psychology. If you have questions about this
+                  research, please contact Michael C. Frank at mcfrank@stanford.edu. If you are not satisfied
+                  with how this study is being conducted, or if you have any concerns, complaints, or general
+                  questions about the research or your rights as a participant, please contact the Stanford
+                  Institutional Review Board (IRB) to speak to someone independent of the research team at
+                  irbnonmed@stanford.edu. Your participation in this research is voluntary. You may decline to
+                  answer any or all of the following questions. You may decline further participation, at any time,
+                  without adverse consequences. Your confidentiality is assured; the researchers who have
+                  requested your participation will not receive any personal information about you. 
+              </p>`,
   }  
 
   // Create consent + instructions instructions trial
@@ -227,28 +278,38 @@ async function setupGame() {
     allow_backward: false
   };
 
-  const filename = `${prolificID || Math.floor(Math.random() * 10000000000)}.csv`;
+  const filename = `${responseID || Math.floor(Math.random() * 10000000000)}_TEST.csv`;
   
   const save_data = {
     type: jsPsychPipe,
     action: "save",
     experiment_id: "c6Ea6z7ZniUx",
     filename: filename,
-    data_string: () => jsPsych.data.get().csv(),
+    data_string: () => jsPsych.data.get().csv(), 
+    on_finish: async () => {
+      for (let i = 0; i < randomSubset.length; i++) {
+        const stim = randomSubset[i];
+        const stimId = stim.file.split(".")[0];
+        const stimCount = await getCount(stimId); 
+
+        await updateCount(stimCount, stimId);
+
+        console.log(`Updated count for image ${i}: ${stimId}`);
+      }
+    }
   };
 
   // Create goodbye trial (this doesn't close the browser yet)
   const goodbye = {
     type: jsPsychInstructions,
     pages: [
-      'Thanks for participating in our experiment! You are all done now. Please click the button to be redirected to the prolific app (this will record your completion of the study).'
+      `Thanks for participating in our experiment! You are all done now. Please enter this completion code into BeSample to complete the study and recieve credit: ${completionCode}.`
             ],
     show_clickable_nav: true,
     allow_backward: false,
-    button_label_next: 'Submit',    
-    on_finish: async () => {
-      await updateAssigned(runNumber);
-      window.location = "https://app.prolific.com/submissions/complete?cc=CJNCFAJ5"
+    button_label_next: 'Submit',  
+    on_finish: () => { 
+      console.log(jsPsych.data);
     }
   }
 
