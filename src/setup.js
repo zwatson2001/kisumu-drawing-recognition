@@ -100,11 +100,11 @@ async function setupGame() {
     }
   }
 
-  
+  /*
   stimuli.forEach(async (stim) => {
     resetCount(stim.file.split(".")[0]); 
   })
-
+*/
 
   // change this if running with new drawings
   const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
