@@ -100,11 +100,11 @@ async function setupGame() {
     }
   }
 
-  /*
+  
   stimuli.forEach(async (stim) => {
     resetCount(stim.file.split(".")[0]); 
   })
-  */
+
 
   // change this if running with new drawings
   const ageGroupIds = [[1, 20], [21, 40], [41, 60], [61, 80], [81, 100], [101, 120]];
@@ -297,7 +297,7 @@ async function setupGame() {
 
   // Define consent form language             
   consentHTML = {    
-    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 15 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $3.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 15 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $0.50.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
   }
   // Define instructions language
   instructionsHTML = {  
