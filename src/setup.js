@@ -333,7 +333,7 @@ async function setupGame() {
     allow_backward: false
   };
 
-  const filename = `${responseID || Math.floor(Math.random() * 10000000000)}_TEST.csv`;
+  const filename = `${assignmentID || Math.floor(Math.random() * 10000000000)}.csv`;
   
   const save_data = {
     type: jsPsychPipe,
