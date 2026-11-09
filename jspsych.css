@@ -229,7 +229,9 @@
 
 #jspsych-image-button-response-btngroup {
   display: grid;
-  grid-template-columns: auto auto auto auto auto auto;
+  grid-template-columns: repeat(7, auto);
+  justify-content: center;
+  gap: 6px 8px;
 }
 
 
