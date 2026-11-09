@@ -3,19 +3,22 @@ async function setupGame() {
         default_iti: 1000,
         show_progress_bar: true
     });
+
+  const completionCodeManual = "NO_COMPLETION_CODE";
   
   // run with stimulus set defined in URL
   const stimulusSet = jsPsych.data.getURLVariable('stimulus_set');
 
-  // TODO: capture Prolific info
-  const assignmentID = jsPsych.data.getURLVariable('assignment_id');
-  const responseID = parseInt(jsPsych.data.getURLVariable('response_id'));
-  const beSampleID = 98041;
-  const completionCode = responseID * beSampleID; 
+  // capture info from Prolific
+  const prolificID = jsPsych.data.getURLVariable('PROLIFIC_PID');
+  const studyID = jsPsych.data.getURLVariable('STUDY_ID');
+  const sessionID = jsPsych.data.getURLVariable('SESSION_ID');
+  const completionCode = jsPsych.data.getURLVariable('CC') || completionCodeManual;
 
   jsPsych.data.addProperties({
-    participant_id: assignmentID,
-    response_id: responseID
+    study_id: studyID, 
+    session_id: sessionID, 
+    participant_id: prolificID
   });
   
   const main_on_finish = function(data) {
@@ -23,8 +26,6 @@ async function setupGame() {
   }
 
   const additionalInfo = {
-    assignmentID: assignmentID, 
-    responseID: responseID,
     on_finish: main_on_finish
   }  
 
@@ -114,7 +115,7 @@ async function setupGame() {
         post_trial_gap: 500,
         data: {
           drawing_category: drawing_category,
-          drawing_id: filename, 
+          drawing_id: filename.split('.')[0], 
           catch_trial: false, 
           prep_trial: false,
         },
@@ -147,7 +148,7 @@ async function setupGame() {
         data: {
           catch_trial: true,
           prep_trial: false,
-          tracing_type: 2,
+          drawing_category: "fish",
         },
         post_trial_gap: 500,
         on_finish: (data) => {
@@ -243,12 +244,13 @@ async function setupGame() {
     allow_backward: false
   };
 
-  const filename = `${responseID || Math.floor(Math.random() * 10000000000)}_TEST.csv`;
+  const testSuffix = prolificID ? "" : "_TEST";
+  const filename = `${prolificID || Math.floor(Math.random() * 10000000000)}${testSuffix}.csv`;
   
   const save_data = {
     type: jsPsychPipe,
     action: "save",
-    experiment_id: "c6Ea6z7ZniUx",
+    experiment_id: "BBGlZ7AF5Zrz",
     filename: filename,
     data_string: () => jsPsych.data.get().csv(),
   };
@@ -257,13 +259,13 @@ async function setupGame() {
   const goodbye = {
     type: jsPsychInstructions,
     pages: [
-      `Thanks for participating in our experiment! You are all done now. Please enter this completion code into BeSample to complete the study and recieve credit: ${completionCode}.`
+      'Thanks for participating in our experiment! You are all done now. Please click the button to be redirected to the prolific app (this will record your completion of the study).'
             ],
     show_clickable_nav: true,
     allow_backward: false,
-    button_label_next: 'Submit',  
-    on_finish: () => { 
-      console.log(jsPsych.data);
+    button_label_next: 'Submit',    
+    on_finish: async () => {
+      window.location = `https://app.prolific.com/submissions/complete?cc=${completionCode}`;
     }
   }
 
@@ -287,5 +289,3 @@ async function setupGame() {
     })
   })
 }
-
-
