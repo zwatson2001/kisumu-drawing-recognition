@@ -4,7 +4,7 @@ async function setupGame() {
         show_progress_bar: true
     });
 
-  const completionCodeManual = "NO_COMPLETION_CODE";
+  const completionCodeManual = "C9BUNEV2";
   
   // run with stimulus set defined in URL
   const stimulusSet = jsPsych.data.getURLVariable('stimulus_set');
@@ -220,7 +220,7 @@ async function setupGame() {
   // Define consent form language             
   // Define consent form language             
   consentHTML = {    
-    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 15 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $2.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 10 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $2.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
   }
   // Define instructions language
   instructionsHTML = {  
