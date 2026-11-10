@@ -29,7 +29,7 @@ async function setupGame() {
     on_finish: main_on_finish
   }  
 
-  const choices = ['Cow', 'Fish', 'Goat', 'Key', 'Mango', 'Person', 'Phone', 'Dog', 'Zebra', 'Face', 'Chicken', 'Banana', 'Sandal', 'Hand'];
+  const choices = ['Banana', 'Chicken', 'Cow', 'Dog', 'Face', 'Fish', 'Goat', 'Hand', 'Key', 'Mango', 'Person', 'Phone', 'Sandal', 'Zebra'];
   const prompt = "<p id = promptid>Which category does this drawing belong to?</p>";
 
   const responseButtonHtml = () =>
