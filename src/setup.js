@@ -4,7 +4,7 @@ async function setupGame() {
         show_progress_bar: true
     });
 
-  const completionCodeManual = "C9BUNEV2";
+  const completionCodeManual = "";
   
   // run with stimulus set defined in URL
   const stimulusSet = jsPsych.data.getURLVariable('stimulus_set');
@@ -29,11 +29,12 @@ async function setupGame() {
     on_finish: main_on_finish
   }  
 
-  const choices = ['Banana', 'Chicken', 'Cow', 'Dog', 'Face', 'Fish', 'Goat', 'Hand', 'Key', 'Mango', 'Person', 'Phone', 'Sandal', 'Zebra'];
-  const prompt = "<p id = promptid>Which category does this drawing belong to?</p>";
+  const choices = ['1', '2', '3', '4', '5'];
+  const buttonText = ['1 (very bad)', '2 (bad)', '3 (neither good nor bad)', '4 (good)', '5 (very good)'];
+  const prompt = "<p id = promptid>Please give this tracing a rating from 1 to 5.</p>";
 
   const responseButtonHtml = () =>
-    _.map(choices, (choice) => `<button class="jspsych-btn" style="width:auto">${choice}</button>`);
+    _.map(buttonText, (text) => `<button class="jspsych-btn" style="width:auto">${text}</button>`);
 
   function equalizeResponseButtonWidths() {
     const buttons = document.querySelectorAll(
@@ -87,7 +88,7 @@ async function setupGame() {
   function getImageUrl(fileName) {
     return s3.getSignedUrl('getObject', {
       Bucket: BUCKET,
-      Key: `drawings/${fileName}`,
+      Key: `tracings/${fileName}`,
       Expires: 900, // seconds
     });
   }
@@ -103,7 +104,7 @@ async function setupGame() {
   function createTrialsList(callback) {      
     stimuli.forEach((stim) => {
       const filename = stim + '.webp';
-      const drawing_category = stim.split('_').pop();
+      const tracing_type = stim.split('_').pop();
 
       const trial = {
         type: jsPsychImageButtonResponse,
@@ -114,7 +115,7 @@ async function setupGame() {
         stimulus: () => getImageUrl(filename),
         post_trial_gap: 500,
         data: {
-          drawing_category: drawing_category,
+          tracing_type: tracing_type,
           drawing_id: filename.split('.')[0], 
           catch_trial: false, 
           prep_trial: false,
@@ -134,7 +135,7 @@ async function setupGame() {
 
   function createCatchTrials(callback) {
     // manually create a catch trial metadata object
-    catch_paths = [{'drawing_category': 'Fish', 'path': 'stimuli/catch_trials/fish-catch.jpeg'}]
+    catch_paths = [{'tracing_type': 'Square', 'path': 'stimuli/catch_trials/fish-catch.jpeg'}]
                   
     // make list of catch trials in same format as the other trials
     catchtrials = _.map(catch_paths, function(n,i) {
@@ -148,7 +149,7 @@ async function setupGame() {
         data: {
           catch_trial: true,
           prep_trial: false,
-          drawing_category: "fish",
+          tracing_type: "Square",
         },
         post_trial_gap: 500,
         on_finish: (data) => {
@@ -163,37 +164,6 @@ async function setupGame() {
     catchtrials.forEach((trial) => {
       rawTrials.splice(Math.floor(Math.random() * rawTrials.length), 0, trial);
     });
-
-    prep_paths = [
-      { drawing_category: 'Banana', path: 'stimuli/prep_trials/banana-prep.jpg' },
-      { drawing_category: 'Hand', path: 'stimuli/prep_trials/hand-prep.jpeg' },
-    ];
-
-    preptrials = _.map(prep_paths, function (n) {
-      return trial = {
-        type: jsPsychImageButtonResponse,
-        prompt: prompt,
-        choices: choices,
-        button_html: responseButtonHtml,
-        on_load: imageButtonResponseOnLoad,
-        stimulus: n.path,
-        data: {
-          catch_trial: false,
-          prep_trial: true,
-          drawing_category: n.drawing_category,
-        },
-        post_trial_gap: 500,
-        on_finish: (data) => {
-          jsPsych.data.addDataToLastTrial({
-            response: choices[data.response]
-          });
-        },
-      };
-    });
-
-    for (let i = 0; i < preptrials.length; i++) {
-      rawTrials.unshift(preptrials[i]);
-    };
     
     // add trialNum to trial list with catch trials included now
     rawTrials = rawTrials.map((n,i) => {
@@ -218,16 +188,16 @@ async function setupGame() {
   rawTrials.unshift(preloadTrial);
 
   // Define consent form language             
-  // Define consent form language             
   consentHTML = {    
-    'str1' : '<p> Hello! In this study, you will be asked to recognize and label various sketches! </p><p> We expect the average game to last about 10 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $2.00.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+    'str1' : '<p> Hello! In this study, you will be asked to rate the quality of a series of 96 tracings! </p> We expect the average game to last about 16 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $3.20.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
   }
   // Define instructions language
   instructionsHTML = {  
-    'str1' : "<p id = 'tightinstruction'> We are interested in your ability to recognize a drawing --- specifically, how accurately you can match a drawing to its label.</p> <p> In total, you will be asked to rate 84 sketches.</p>",
-    'str2' : '<p id = "exampleprompt"> On each trial you will be shown a drawing and 14 category labels (e.g. "FISH"). Your job will be to select the category that matches the drawing.',
-    'str3' : "<p> Please adjust your screen (by zooming in/out) such that the drawings and labels are not blocked in any way.</p> <p>Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
-  }    
+    'str1' : "<p id = 'exampleprompt'> On each trial you will be shown a blue tracing of a gray background object. Please give the tracing a rating from 1 (very bad) to 5 (very good) based on how much the blue lines overlap with the gray lines.</p>",
+    'str2' : "<p> Here is an example of a high-quality tracing: </p><img src='stimuli/examples/example_good.png'; height='400px'></img>",
+    'str3' : "<p> Here is an example of a low-quality tracing: </p><img src='stimuli/examples/example_bad.png'; height='400px'></img>",
+    'str4' : "<p> Please adjust your screen (by zooming in/out) such that the tracings and rating buttons are not blocked in any way.</p> <p> Once you are finished, the study will be automatically submitted for approval. If you encounter a problem or error, please send us an email <a href='mailto://langcoglab@stanford.edu'>(langcoglab@stanford.edu)</a> and we will make sure you're compensated for your time. Thank you again for contributing to our research! Let's begin! </p>"
+  }   
 
   // Create consent + instructions instructions trial
   const welcome = {
