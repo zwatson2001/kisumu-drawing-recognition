@@ -189,7 +189,7 @@ async function setupGame() {
 
   // Define consent form language             
   consentHTML = {    
-    'str1' : '<p> Hello! In this study, you will be asked to rate the quality of a series of 96 tracings! </p> We expect the average game to last about 16 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $3.20.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
+    'str1' : '<p> Hello! In this study, you will be asked to rate the quality of a series of 48 tracings! </p> We expect the average game to last about 8 minutes, including the time it takes to read these instructions. For your participation in this study, you will be paid $1.60.</p><i><p> Note: We recommend using Chrome. We have not tested this study in other browsers.</p></i>',
   }
   // Define instructions language
   instructionsHTML = {  
