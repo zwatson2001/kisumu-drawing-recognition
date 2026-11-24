@@ -135,7 +135,7 @@ async function setupGame() {
 
   function createCatchTrials(callback) {
     // manually create a catch trial metadata object
-    catch_paths = [{'tracing_type': 'Square', 'path': 'stimuli/catch_trials/fish-catch.jpeg'}]
+    catch_paths = [{'tracing_type': 'Square', 'path': 'stimuli/catch_trials/tracing_catch.png'}]
                   
     // make list of catch trials in same format as the other trials
     catchtrials = _.map(catch_paths, function(n,i) {
@@ -207,6 +207,7 @@ async function setupGame() {
       instructionsHTML.str1,
       instructionsHTML.str2,
       instructionsHTML.str3,
+      instructionsHTML.str4,
     ],
     force_wait: 2000, 
     show_clickable_nav: true,
